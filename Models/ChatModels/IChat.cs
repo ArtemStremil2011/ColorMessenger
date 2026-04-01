@@ -1,4 +1,6 @@
-﻿namespace Messenger.Models.ChatModels
+﻿using Messenger.Models.BaseModels;
+
+namespace Messenger.Models.ChatModels
 {
     public interface IChat
     {
@@ -8,12 +10,14 @@
         public ICollection<Message> MessagesHistory { get; set; }
         public int MaxUsers { get; set; }
         public bool IsPrivate { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime? LastActivityAt { get; set; }
+        public User? CreatedBy { get; set; }
 
-        // Новые методы
         public void AddUser(User user);
-        public void AddUser(User user, User? addedBy = null);
+        public void AddUser(User user, User? addedBy);
         public void RemoveUser(User user);
-        public void RemoveUser(User user, User? removedBy = null);
+        public void RemoveUser(User user, User? removedBy);
         public bool IsUserInChat(User user);
         public bool CanUserManageUsers(User user);
     }

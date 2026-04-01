@@ -1,4 +1,6 @@
-﻿namespace Messenger.Models
+﻿using Messenger.Models.BaseModels;
+
+namespace Messenger.Models
 {
     public class MessageStore
     {

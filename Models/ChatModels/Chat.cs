@@ -1,32 +1,41 @@
-﻿using System;
+﻿using Messenger.Models.BaseModels;
+using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 
 namespace Messenger.Models.ChatModels
 {
     public class Chat : IChat
     {
+        [Key]
         public Guid Id { get; set; }
+
+        [Required]
+        [StringLength(100)]
         public string ChatName { get; set; } = string.Empty;
-        public ICollection<User> Users { get; set; } = new List<User>();
-        public ICollection<Message> MessagesHistory { get; set; } = new List<Message>();
-        public int MaxUsers { get; set; }
-        public bool IsPrivate { get; set; }
 
+        public virtual ICollection<User> Users { get; set; } = new List<User>();
+        public virtual ICollection<Message> MessagesHistory { get; set; } = new List<Message>();
+
+        public int MaxUsers { get; set; } = 2;
+        public bool IsPrivate { get; set; } = true;
+
+        [Required]
         public DateTime CreatedAt { get; set; }
-        public DateTime? LastActivityAt { get; set; }
-        public User? CreatedBy { get; set; }
 
-        public Chat(string name, ICollection<User> users)
+        public DateTime? LastActivityAt { get; set; }
+
+        public Guid? CreatedById { get; set; }
+
+        [ForeignKey(nameof(CreatedById))]
+        public virtual User? CreatedBy { get; set; }
+
+        public Chat()
         {
             Id = Guid.NewGuid();
-            ChatName = name ?? throw new ArgumentNullException(nameof(name));
-            Users = users ?? new List<User>();
-            MessagesHistory = new List<Message>();
-            MaxUsers = 2;
-            IsPrivate = true;
             CreatedAt = DateTime.UtcNow;
-            CreatedBy = users?.FirstOrDefault();
         }
 
         public void AddUser(User user)
@@ -40,13 +49,12 @@ namespace Messenger.Models.ChatModels
             if (!IsUserInChat(user))
             {
                 Users.Add(user);
-                UpdateActivity();
+                LastActivityAt = DateTime.UtcNow;
             }
         }
 
         public void AddUser(User user, User? addedBy)
         {
-            // В личном чате добавление работает одинаково, независимо от того, кто добавляет
             AddUser(user);
         }
 
@@ -59,31 +67,22 @@ namespace Messenger.Models.ChatModels
                 throw new InvalidOperationException("В чате должен быть хотя бы один пользователь");
 
             Users.Remove(user);
-            UpdateActivity();
+            LastActivityAt = DateTime.UtcNow;
         }
 
         public void RemoveUser(User user, User? removedBy)
         {
-            // В личном чате удаление работает одинаково
             RemoveUser(user);
         }
 
         public bool IsUserInChat(User user)
         {
-            if (user == null)
-                return false;
-            return Users.Any(u => u.Id == user.Id);
+            return user != null && Users.Any(u => u.Id == user.Id);
         }
 
         public bool CanUserManageUsers(User user)
         {
-            // В личном чате оба пользователя могут управлять
             return IsUserInChat(user);
-        }
-
-        private void UpdateActivity()
-        {
-            LastActivityAt = DateTime.UtcNow;
         }
 
         public User? GetOtherUser(User currentUser)

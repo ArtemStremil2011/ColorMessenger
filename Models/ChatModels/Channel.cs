@@ -1,40 +1,45 @@
-﻿using System;
+﻿using Messenger.Models.BaseModels;
+using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 
 namespace Messenger.Models.ChatModels
 {
     public class Channel : IChat
     {
+        [Key]
         public Guid Id { get; set; }
+
+        [Required]
+        [StringLength(100)]
         public string ChatName { get; set; } = string.Empty;
-        public ICollection<User> Users { get; set; } = new List<User>();
-        public ICollection<Message> MessagesHistory { get; set; } = new List<Message>();
+
+        public virtual ICollection<User> Users { get; set; } = new List<User>();
+        public virtual ICollection<Message> MessagesHistory { get; set; } = new List<Message>();
+
+        [Range(1, 10000)]
         public int MaxUsers { get; set; }
+
         public bool IsPrivate { get; set; }
 
+        [Required]
         public DateTime CreatedAt { get; set; }
-        public DateTime? LastActivityAt { get; set; }
-        public User? CreatedBy { get; set; }
-        public List<User> Admins { get; set; } = new List<User>();
 
-        public Channel(string name, ICollection<User> users, ICollection<Message> messagesHistory, bool isPrivate, int maxUsers)
+        public DateTime? LastActivityAt { get; set; }
+
+        public Guid? CreatedById { get; set; }
+
+        [ForeignKey(nameof(CreatedById))]
+        public virtual User? CreatedBy { get; set; }
+
+        public virtual List<User> Admins { get; set; } = new List<User>();
+
+        public Channel()
         {
             Id = Guid.NewGuid();
-            ChatName = name ?? throw new ArgumentNullException(nameof(name));
-            Users = users ?? new List<User>();
-            MessagesHistory = messagesHistory ?? new List<Message>();
-            MaxUsers = maxUsers;
-            IsPrivate = isPrivate;
             CreatedAt = DateTime.UtcNow;
-            CreatedBy = users?.FirstOrDefault();
-
-            Admins = new List<User>();
-            var firstUser = users?.FirstOrDefault();
-            if (firstUser != null)
-            {
-                Admins.Add(firstUser);
-            }
         }
 
         public void AddUser(User user)
@@ -48,7 +53,7 @@ namespace Messenger.Models.ChatModels
             if (!IsUserInChat(user))
             {
                 Users.Add(user);
-                UpdateActivity();
+                LastActivityAt = DateTime.UtcNow;
             }
         }
 
@@ -57,17 +62,10 @@ namespace Messenger.Models.ChatModels
             if (user == null)
                 throw new ArgumentNullException(nameof(user));
 
-            if (IsPrivate && addedBy != null && !CanUserManageUsers(addedBy))
-                throw new UnauthorizedAccessException("Только администраторы могут добавлять пользователей в приватный канал");
+            if (IsPrivate && (addedBy == null || !CanUserManageUsers(addedBy)))
+                throw new UnauthorizedAccessException("Только администраторы могут добавлять пользователей");
 
-            if (Users.Count >= MaxUsers)
-                throw new InvalidOperationException($"Достигнут лимит подписчиков ({MaxUsers})");
-
-            if (!IsUserInChat(user))
-            {
-                Users.Add(user);
-                UpdateActivity();
-            }
+            AddUser(user);
         }
 
         public void RemoveUser(User user)
@@ -76,11 +74,13 @@ namespace Messenger.Models.ChatModels
                 throw new ArgumentNullException(nameof(user));
 
             if (IsAdmin(user) && Admins.Count <= 1)
-                throw new InvalidOperationException("Нельзя удалить единственного администратора канала");
+                throw new InvalidOperationException("Нельзя удалить единственного администратора");
 
-            Users.Remove(user);
-            Admins.Remove(user);
-            UpdateActivity();
+            if (Users.Remove(user))
+            {
+                Admins.Remove(user);
+                LastActivityAt = DateTime.UtcNow;
+            }
         }
 
         public void RemoveUser(User user, User? removedBy)
@@ -91,63 +91,22 @@ namespace Messenger.Models.ChatModels
             if (removedBy != null && !CanUserManageUsers(removedBy))
                 throw new UnauthorizedAccessException("Только администраторы могут удалять пользователей");
 
-            if (IsAdmin(user) && Admins.Count <= 1)
-                throw new InvalidOperationException("Нельзя удалить единственного администратора канала");
-
-            Users.Remove(user);
-            Admins.Remove(user);
-            UpdateActivity();
+            RemoveUser(user);
         }
 
         public bool IsUserInChat(User user)
         {
-            if (user == null)
-                return false;
-            return Users.Any(u => u.Id == user.Id);
+            return user != null && Users.Any(u => u.Id == user.Id);
         }
 
         public bool CanUserManageUsers(User user)
         {
-            if (user == null)
-                return false;
-            return IsAdmin(user);
+            return user != null && IsAdmin(user);
         }
 
         public bool IsAdmin(User user)
         {
-            if (user == null)
-                return false;
-            return Admins.Any(a => a.Id == user.Id);
-        }
-
-        public void AddAdmin(User user)
-        {
-            if (user == null)
-                throw new ArgumentNullException(nameof(user));
-
-            if (!IsUserInChat(user))
-                throw new InvalidOperationException("Пользователь должен быть подписчиком канала");
-
-            if (!IsAdmin(user))
-            {
-                Admins.Add(user);
-            }
-        }
-
-        public void RemoveAdmin(User user)
-        {
-            if (user == null)
-                throw new ArgumentNullException(nameof(user));
-
-            if (Admins.Count <= 1 && IsAdmin(user))
-                throw new InvalidOperationException("В канале должен быть хотя бы один администратор");
-
-            Admins.Remove(user);
-        }
-
-        private void UpdateActivity()
-        {
-            LastActivityAt = DateTime.UtcNow;
+            return user != null && Admins.Any(a => a.Id == user.Id);
         }
     }
 }
