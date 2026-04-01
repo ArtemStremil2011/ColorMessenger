@@ -1,0 +1,31 @@
+# Visual Studio
+.vs/
+bin/
+obj/
+Debug/
+Release/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+build/
+artifacts/
+
+# NuGet packages
+packages/
+*.nupkg
+
+# .NET Core
+project.lock.json
+project.fragment.lock.json
+
+# Rider
+.idea/
+
+# VS Code
+.vscode/
