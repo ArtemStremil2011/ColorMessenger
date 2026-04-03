@@ -19,7 +19,7 @@ namespace Messenger.Models.BaseModels
         public DateTime MessageLastUpdateDate { get; set; }
 
         [Required]
-        public int UserId { get; set; }
+        public Guid UserId { get; set; }
 
         [ForeignKey(nameof(UserId))]
         public virtual User? MessageCreator { get; set; }
