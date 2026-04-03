@@ -24,6 +24,12 @@ namespace Messenger.DTOs
         DateTime? LastActivityAt
     ) : ChatBaseDTO(Id, ChatName, Users.Count, 2, true, CreatedAt, LastActivityAt, null);
 
+    public record CreateChatDTO(
+    Guid User1Id,
+    Guid User2Id,
+    string? ChatName
+    );
+
     // Для группы
     public record GroupResponseDTO(
         Guid Id,
@@ -37,6 +43,13 @@ namespace Messenger.DTOs
         UserResponseDTO? CreatedBy
     ) : ChatBaseDTO(Id, ChatName, Users.Count, MaxUsers, IsPrivate, CreatedAt, LastActivityAt, CreatedBy);
 
+    public record CreateGroupDTO(
+        string ChatName,
+        int MaxUsers,
+        bool IsPrivate,
+        Guid CreatedById
+    );
+
     // Для канала
     public record ChannelResponseDTO(
         Guid Id,
@@ -49,4 +62,11 @@ namespace Messenger.DTOs
         DateTime? LastActivityAt,
         UserResponseDTO? CreatedBy
     ) : ChatBaseDTO(Id, ChatName, Users.Count, MaxUsers, IsPrivate, CreatedAt, LastActivityAt, CreatedBy);
+
+    public record CreateChannelDTO(
+        string ChatName,
+        int MaxUsers,
+        bool IsPrivate,
+        Guid CreatedById
+    );
 }
