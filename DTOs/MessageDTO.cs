@@ -7,14 +7,14 @@ namespace Messenger.DTOs
         string MessageText,
         DateTime MessageCreateDate,
         DateTime? MessageLastUpdateDate,
-        int UserId,
+        Guid UserId,
         UserResponseDTO? MessageCreator,
         bool IsDeleted
     );
 
     public record MessageCreateDTO(
         string MessageText,
-        int UserId
+        Guid UserId
     );
 
     public record MessageUpdateDTO(
