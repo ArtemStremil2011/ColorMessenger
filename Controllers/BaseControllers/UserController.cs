@@ -17,6 +17,37 @@ namespace Messenger.Controllers.BaseControllers
             _context = context;
         }
 
+        [HttpGet("user/{userId}")]
+        public async Task<IActionResult> GetAllMessageByUser(Guid userId)
+        {
+            var userExists = await _context.Users.AnyAsync(u => u.Id == userId);
+            if (!userExists)
+                return NotFound($"User with Id {userId} not found");
+
+            var messages = await _context.Messages
+                .Include(m => m.MessageCreator)
+                .Where(m => m.UserId == userId && !m.IsDeleted)
+                .OrderByDescending(m => m.MessageCreateDate)
+                .Select(m => new MessageResponseDTO(
+                    m.MessageId,
+                    m.MessageText,
+                    m.MessageCreateDate,
+                    m.MessageLastUpdateDate,
+                    m.UserId,
+                    m.ChatId,
+                    m.MessageCreator != null ? new UserResponseDTO(
+                        m.MessageCreator.Id,
+                        m.MessageCreator.Name,
+                        m.MessageCreator.AvatarPath,
+                        m.MessageCreator.RegisterDate
+                    ) : null,
+                    m.IsDeleted
+                ))
+                .ToListAsync();
+
+            return Ok(messages);
+        }
+
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {

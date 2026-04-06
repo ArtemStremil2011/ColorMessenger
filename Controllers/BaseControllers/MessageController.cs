@@ -4,7 +4,6 @@ using Messenger.Models;
 using Messenger.Models.BaseModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Linq;
 
 namespace Messenger.Controllers.BaseControllers
 {
@@ -32,6 +31,7 @@ namespace Messenger.Controllers.BaseControllers
                     m.MessageCreateDate,
                     m.MessageLastUpdateDate,
                     m.UserId,
+                    m.ChatId,
                     m.MessageCreator != null ? new UserResponseDTO(
                         m.MessageCreator.Id,
                         m.MessageCreator.Name,
@@ -57,6 +57,7 @@ namespace Messenger.Controllers.BaseControllers
                     m.MessageCreateDate,
                     m.MessageLastUpdateDate,
                     m.UserId,
+                    m.ChatId,
                     m.MessageCreator != null ? new UserResponseDTO(
                         m.MessageCreator.Id,
                         m.MessageCreator.Name,
@@ -83,10 +84,15 @@ namespace Messenger.Controllers.BaseControllers
             if (user == null)
                 return BadRequest($"User with Id {messageCreateDto.UserId} not found");
 
+            var chat = await _context.Chats.FindAsync(messageCreateDto.ChatId);
+            if (chat == null)
+                return BadRequest($"Chat with Id {messageCreateDto.ChatId} not found");
+
             var message = new Message
             {
                 MessageText = messageCreateDto.MessageText,
                 UserId = messageCreateDto.UserId,
+                ChatId = messageCreateDto.ChatId,
                 MessageCreateDate = DateTime.UtcNow,
                 MessageLastUpdateDate = DateTime.UtcNow,
                 IsDeleted = false
@@ -101,6 +107,7 @@ namespace Messenger.Controllers.BaseControllers
                 message.MessageCreateDate,
                 message.MessageLastUpdateDate,
                 message.UserId,
+                message.ChatId,
                 new UserResponseDTO(
                     user.Id,
                     user.Name,
@@ -154,6 +161,7 @@ namespace Messenger.Controllers.BaseControllers
                 message.MessageCreateDate,
                 message.MessageLastUpdateDate,
                 message.UserId,
+                message.ChatId,
                 message.MessageCreator != null ? new UserResponseDTO(
                     message.MessageCreator.Id,
                     message.MessageCreator.Name,

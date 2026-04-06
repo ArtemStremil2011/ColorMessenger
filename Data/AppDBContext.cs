@@ -171,4 +171,4 @@ namespace Messenger.Data
             base.OnModelCreating(modelBuilder);
         }
     }
-}
+}   

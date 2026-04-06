@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Messenger.Models.ChatModels;
+using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -25,6 +26,12 @@ namespace Messenger.Models.BaseModels
         public virtual User? MessageCreator { get; set; }
 
         public bool IsDeleted { get; set; }
+
+        [Required]
+        public Guid ChatId { get; set; }
+
+        [ForeignKey(nameof(ChatId))]
+        public virtual Chat? Chat { get; set; }
 
         public Message()
         {
