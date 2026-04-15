@@ -46,7 +46,7 @@ namespace Messenger.Controllers.BaseControllers
                 .ToListAsync();
 
             return Ok(messages);
-        }
+        } 
 
         [HttpGet]
         public async Task<IActionResult> GetAll()

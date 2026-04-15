@@ -45,6 +45,8 @@ namespace Messenger.Controllers.BaseControllers
             return Ok(messages);
         }
 
+
+
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(Guid id)
         {
