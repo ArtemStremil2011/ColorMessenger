@@ -2,6 +2,7 @@
 using Messenger.DTOs;
 using Messenger.Models.BaseModels;
 using Messenger.Models.ChatModels;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,6 +10,7 @@ namespace Messenger.Controllers.ChatControllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class ChannelController : ControllerBase
     {
         private readonly AppDBContext _context;

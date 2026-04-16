@@ -1,25 +1,36 @@
 ﻿using Messenger.Data;
 using Messenger.DTOs;
 using Messenger.Models.BaseModels;
+using Messenger.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
+using System.Text.RegularExpressions;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Messenger.Controllers.BaseControllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class UserController : ControllerBase
     {
         private readonly AppDBContext _context;
         private readonly PasswordHasher<User> _passwordHasher;
+        private readonly ISmsService _smsService;
 
-        public UserController(AppDBContext context)
+        public UserController(AppDBContext context, ISmsService smsService)
         {
             _context = context;
             _passwordHasher = new PasswordHasher<User>();
+            _smsService = smsService;
         }
 
+        [Authorize]
         [HttpGet("user/{userId}")]
         public async Task<IActionResult> GetAllMessageByUser(Guid userId)
         {
@@ -51,6 +62,7 @@ namespace Messenger.Controllers.BaseControllers
             return Ok(messages);
         }
 
+        [Authorize]
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -66,6 +78,7 @@ namespace Messenger.Controllers.BaseControllers
             return Ok(users);
         }
 
+        [Authorize]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(Guid id)
         {
@@ -85,6 +98,145 @@ namespace Messenger.Controllers.BaseControllers
             return Ok(user);
         }
 
+        [AllowAnonymous]
+        [HttpPost("register")]
+        public async Task<IActionResult> Register([FromBody] UserRegisterDTO registerDto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var existingUser = await _context.Users
+                .FirstOrDefaultAsync(u => u.PhoneNumber == registerDto.PhoneNumber);
+
+            if (existingUser != null)
+                return BadRequest("User with this phone number already exists");
+
+            var existingName = await _context.Users
+                .AnyAsync(u => u.Name == registerDto.Name);
+
+            if (existingName)
+                return BadRequest("Username already taken");
+
+            var verificationCode = await _smsService.SendVerificationCodeAsync(registerDto.PhoneNumber);
+
+            var user = new User
+            {
+                PhoneNumber = registerDto.PhoneNumber,
+                Name = registerDto.Name,
+                PasswordHash = _passwordHasher.HashPassword(null!, registerDto.Password),
+                IsPhoneNumberConfirmed = false,
+                PhoneVerificationCode = verificationCode,
+                VerificationCodeExpiry = DateTime.UtcNow.AddMinutes(10)
+            };
+
+            await _context.Users.AddAsync(user);
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Verification code sent to your phone number",
+                phoneNumber = user.PhoneNumber,
+                testCode = verificationCode
+            });
+        }
+
+        [AllowAnonymous]
+        [HttpPost("verify-phone")]
+        public async Task<IActionResult> VerifyPhone([FromBody] VerifyPhoneDTO verifyDto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.PhoneNumber == verifyDto.PhoneNumber);
+
+            if (user == null)
+                return NotFound("User not found");
+
+            if (user.IsPhoneNumberConfirmed)
+                return BadRequest("Phone number already verified");
+
+            if (user.PhoneVerificationCode != verifyDto.Code)
+                return BadRequest("Invalid verification code");
+
+            if (user.VerificationCodeExpiry < DateTime.UtcNow)
+                return BadRequest("Verification code expired. Please request a new one");
+
+            user.IsPhoneNumberConfirmed = true;
+            user.PhoneVerificationCode = null;
+            user.VerificationCodeExpiry = null;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Phone number verified successfully",
+                userId = user.Id
+            });
+        }
+
+        [AllowAnonymous]
+        [HttpPost("resend-verification")]
+        public async Task<IActionResult> ResendVerificationCode([FromBody] ResendVerificationCodeDTO resendDto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.PhoneNumber == resendDto.PhoneNumber);
+
+            if (user == null)
+                return NotFound("User not found");
+
+            if (user.IsPhoneNumberConfirmed)
+                return BadRequest("Phone number already verified");
+
+            var newCode = await _smsService.SendVerificationCodeAsync(user.PhoneNumber);
+
+            user.PhoneVerificationCode = newCode;
+            user.VerificationCodeExpiry = DateTime.UtcNow.AddMinutes(10);
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "New verification code sent",
+                testCode = newCode
+            });
+        }
+
+        [AllowAnonymous]
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] UserLoginDTO loginDto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.PhoneNumber == loginDto.Login || u.Name == loginDto.Login);
+
+            if (user == null)
+                return Unauthorized("Invalid phone number/username or password");
+
+            if (!user.IsPhoneNumberConfirmed)
+                return Unauthorized("Phone number not verified. Please verify your phone number first.");
+
+            var result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, loginDto.Password);
+
+            if (result == PasswordVerificationResult.Failed)
+                return Unauthorized("Invalid phone number/username or password");
+
+            var token = GenerateJwtToken(user);
+
+            return Ok(new
+            {
+                message = "Login successful",
+                userId = user.Id,
+                token = token
+            });
+        }
+
+        [Authorize]
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] UserCreateDTO userCreateDto)
         {
@@ -118,6 +270,7 @@ namespace Messenger.Controllers.BaseControllers
             return CreatedAtAction(nameof(GetById), new { id = user.Id }, response);
         }
 
+        [Authorize]
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(Guid id, [FromBody] UserUpdateDTO userUpdateDto)
         {
@@ -163,6 +316,7 @@ namespace Messenger.Controllers.BaseControllers
             return Ok(response);
         }
 
+        [Authorize]
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
@@ -180,6 +334,25 @@ namespace Messenger.Controllers.BaseControllers
         private async Task<bool> UserExists(Guid id)
         {
             return await _context.Users.AnyAsync(u => u.Id == id);
+        }
+
+        private string GenerateJwtToken(User user)
+        {
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var key = Encoding.ASCII.GetBytes("your-super-secret-key-with-at-least-32-characters-long");
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                    new Claim(ClaimTypes.Name, user.Name),
+                    new Claim("PhoneNumber", user.PhoneNumber ?? string.Empty)
+                }),
+                Expires = DateTime.UtcNow.AddDays(7),
+                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+            };
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+            return tokenHandler.WriteToken(token);
         }
     }
 }

@@ -1,7 +1,7 @@
 ﻿using Messenger.Data;
 using Messenger.DTOs;
-using Messenger.Models;
 using Messenger.Models.BaseModels;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,6 +9,7 @@ namespace Messenger.Controllers.BaseControllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class MessageController : ControllerBase
     {
         private readonly AppDBContext _context;
@@ -44,8 +45,6 @@ namespace Messenger.Controllers.BaseControllers
 
             return Ok(messages);
         }
-
-
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(Guid id)

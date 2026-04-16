@@ -31,7 +31,7 @@ namespace Messenger.DTOs
 
     public record UserLoginDTO(
         [Required]
-        string Name,
+        string Login,
 
         [Required]
         string Password
