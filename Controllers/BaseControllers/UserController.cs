@@ -3,6 +3,7 @@ using Messenger.DTOs;
 using Messenger.Models.BaseModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
 
 namespace Messenger.Controllers.BaseControllers
 {
@@ -11,10 +12,12 @@ namespace Messenger.Controllers.BaseControllers
     public class UserController : ControllerBase
     {
         private readonly AppDBContext _context;
+        private readonly PasswordHasher<User> _passwordHasher;
 
         public UserController(AppDBContext context)
         {
             _context = context;
+            _passwordHasher = new PasswordHasher<User>();
         }
 
         [HttpGet("user/{userId}")]
@@ -46,7 +49,7 @@ namespace Messenger.Controllers.BaseControllers
                 .ToListAsync();
 
             return Ok(messages);
-        } 
+        }
 
         [HttpGet]
         public async Task<IActionResult> GetAll()
@@ -97,9 +100,10 @@ namespace Messenger.Controllers.BaseControllers
             var user = new User
             {
                 Name = userCreateDto.Name,
-                Password = userCreateDto.Password,
                 AvatarPath = null
             };
+
+            user.PasswordHash = _passwordHasher.HashPassword(user, userCreateDto.Password);
 
             await _context.Users.AddAsync(user);
             await _context.SaveChangesAsync();
@@ -132,7 +136,9 @@ namespace Messenger.Controllers.BaseControllers
                 user.AvatarPath = userUpdateDto.AvatarPath;
 
             if (!string.IsNullOrEmpty(userUpdateDto.NewPassword))
-                user.Password = userUpdateDto.NewPassword;
+            {
+                user.PasswordHash = _passwordHasher.HashPassword(user, userUpdateDto.NewPassword);
+            }
 
             _context.Entry(user).State = EntityState.Modified;
 

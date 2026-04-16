@@ -1,5 +1,6 @@
-﻿using System;
+﻿using Messenger.Models.ChatModels;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Messenger.Models.BaseModels
 {
@@ -12,15 +13,21 @@ namespace Messenger.Models.BaseModels
         [StringLength(50)]
         public string Name { get; set; } = string.Empty;
 
+        [Required]
+        public string PasswordHash { get; set; } = string.Empty; 
+
+        [StringLength(20)]
+        public string? PhoneNumber { get; set; } 
+
         [StringLength(500)]
         public string? AvatarPath { get; set; }
 
-        [Required]
         public DateTime RegisterDate { get; set; }
 
-        [Required]
-        [StringLength(100)]
-        public string Password { get; set; } = string.Empty;
+        public virtual ICollection<Message>? Messages { get; set; }
+        public virtual ICollection<Channel>? Channels { get; set; }
+        public virtual ICollection<Chat>? Chats { get; set; }
+        public virtual ICollection<GroupChat>? GroupChats { get; set; }
 
         public User()
         {

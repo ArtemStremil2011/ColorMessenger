@@ -1,6 +1,7 @@
-﻿namespace Messenger.DTOs
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace Messenger.DTOs
 {
-    // Для чтения данных
     public record UserResponseDTO(
         Guid Id,
         string Name,
@@ -8,22 +9,31 @@
         DateTime RegisterDate
     );
 
-    // Для создания/обновления
     public record UserCreateDTO(
+        [Required]
+        [StringLength(50, MinimumLength = 2)]
         string Name,
+
+        [Required]
+        [StringLength(100, MinimumLength = 6)]
         string Password
     );
 
     public record UserUpdateDTO(
+        [StringLength(50, MinimumLength = 2)]
         string? Name,
+
         string? AvatarPath,
-        string? CurrentPassword,
+
+        [StringLength(100, MinimumLength = 6)]
         string? NewPassword
     );
 
-    // Для логина
     public record UserLoginDTO(
+        [Required]
         string Name,
+
+        [Required]
         string Password
     );
 }
