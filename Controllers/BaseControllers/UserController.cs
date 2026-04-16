@@ -66,6 +66,12 @@ namespace Messenger.Controllers.BaseControllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
+            var currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+            var currentUser = await _context.Users.FindAsync(currentUserId);
+
+            if (currentUser.Role != UserRole.Admin && currentUser.Role != UserRole.SuperAdmin)
+                return Forbid("Only administrators can view all users");
+
             var users = await _context.Users
                 .Select(u => new UserResponseDTO(
                     u.Id,
@@ -277,10 +283,21 @@ namespace Messenger.Controllers.BaseControllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var user = await _context.Users.FindAsync(id);
+            var currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+            var currentUser = await _context.Users.FindAsync(currentUserId);
 
+            if (currentUser == null)
+                return Unauthorized();
+
+            var user = await _context.Users.FindAsync(id);
             if (user == null)
                 return NotFound($"User with Id {id} not found");
+
+            if (currentUser.Id != user.Id && currentUser.Role != UserRole.Admin && currentUser.Role != UserRole.SuperAdmin)
+                return Forbid("You can only update your own profile");
+
+            if (user.Role == UserRole.SuperAdmin && currentUser.Role != UserRole.SuperAdmin)
+                return Forbid("Cannot update SuperAdmin");
 
             if (!string.IsNullOrEmpty(userUpdateDto.Name))
                 user.Name = userUpdateDto.Name;
@@ -320,15 +337,29 @@ namespace Messenger.Controllers.BaseControllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
-            var user = await _context.Users.FindAsync(id);
+            var currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+            var currentUser = await _context.Users.FindAsync(currentUserId);
 
-            if (user == null)
+            if (currentUser == null)
+                return Unauthorized();
+
+            var userToDelete = await _context.Users.FindAsync(id);
+            if (userToDelete == null)
                 return NotFound($"User with Id {id} not found");
 
-            _context.Users.Remove(user);
+            if (currentUser.Id != userToDelete.Id && currentUser.Role != UserRole.Admin && currentUser.Role != UserRole.SuperAdmin)
+                return Forbid("You don't have permission to delete this user");
+
+            if (userToDelete.Role == UserRole.SuperAdmin && currentUser.Role != UserRole.SuperAdmin)
+                return Forbid("Cannot delete SuperAdmin");
+
+            if (userToDelete.Role == UserRole.Admin && currentUser.Role != UserRole.SuperAdmin && currentUser.Id != userToDelete.Id)
+                return Forbid("Only SuperAdmin can delete another Admin");
+
+            _context.Users.Remove(userToDelete);
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "User successfully deleted", id = user.Id });
+            return Ok(new { message = "User successfully deleted", id = userToDelete.Id });
         }
 
         private async Task<bool> UserExists(Guid id)

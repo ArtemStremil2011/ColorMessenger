@@ -4,6 +4,7 @@ using Messenger.Models.BaseModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace Messenger.Controllers.BaseControllers
 {
@@ -22,6 +23,12 @@ namespace Messenger.Controllers.BaseControllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
+            var currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+            var currentUser = await _context.Users.FindAsync(currentUserId);
+
+            if (currentUser.Role != UserRole.Admin && currentUser.Role != UserRole.SuperAdmin)
+                return Forbid("Only administrators can view all messages");
+
             var messages = await _context.Messages
                 .Include(m => m.MessageCreator)
                 .Where(m => !m.IsDeleted)
@@ -81,6 +88,11 @@ namespace Messenger.Controllers.BaseControllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
+            var currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+
+            if (currentUserId != messageCreateDto.UserId)
+                return Forbid("You cannot create messages on behalf of another user");
+
             var user = await _context.Users.FindAsync(messageCreateDto.UserId);
             if (user == null)
                 return BadRequest($"User with Id {messageCreateDto.UserId} not found");
@@ -130,6 +142,9 @@ namespace Messenger.Controllers.BaseControllers
             if (id != messageUpdateDto.MessageId)
                 return BadRequest("ID mismatch");
 
+            var currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+            var currentUser = await _context.Users.FindAsync(currentUserId);
+
             var message = await _context.Messages
                 .Include(m => m.MessageCreator)
                 .FirstOrDefaultAsync(m => m.MessageId == id);
@@ -139,6 +154,9 @@ namespace Messenger.Controllers.BaseControllers
 
             if (message.IsDeleted)
                 return BadRequest("Cannot update a deleted message");
+
+            if (message.UserId != currentUserId && currentUser.Role != UserRole.Admin && currentUser.Role != UserRole.SuperAdmin)
+                return Forbid("You can only update your own messages");
 
             message.MessageText = messageUpdateDto.MessageText;
             message.MessageLastUpdateDate = DateTime.UtcNow;
@@ -178,6 +196,9 @@ namespace Messenger.Controllers.BaseControllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
+            var currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+            var currentUser = await _context.Users.FindAsync(currentUserId);
+
             var message = await _context.Messages
                 .FirstOrDefaultAsync(m => m.MessageId == id);
 
@@ -186,6 +207,9 @@ namespace Messenger.Controllers.BaseControllers
 
             if (message.IsDeleted)
                 return BadRequest("Message is already deleted");
+
+            if (message.UserId != currentUserId && currentUser.Role != UserRole.Admin && currentUser.Role != UserRole.SuperAdmin)
+                return Forbid("You can only delete your own messages");
 
             message.IsDeleted = true;
             message.MessageLastUpdateDate = DateTime.UtcNow;
@@ -198,6 +222,12 @@ namespace Messenger.Controllers.BaseControllers
         [HttpDelete("permanent/{id}")]
         public async Task<IActionResult> PermanentDelete(Guid id)
         {
+            var currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+            var currentUser = await _context.Users.FindAsync(currentUserId);
+
+            if (currentUser.Role != UserRole.Admin && currentUser.Role != UserRole.SuperAdmin)
+                return Forbid("Only administrators can permanently delete messages");
+
             var message = await _context.Messages
                 .FirstOrDefaultAsync(m => m.MessageId == id);
 
@@ -213,6 +243,9 @@ namespace Messenger.Controllers.BaseControllers
         [HttpPatch("restore/{id}")]
         public async Task<IActionResult> Restore(Guid id)
         {
+            var currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+            var currentUser = await _context.Users.FindAsync(currentUserId);
+
             var message = await _context.Messages
                 .FirstOrDefaultAsync(m => m.MessageId == id);
 
@@ -221,6 +254,9 @@ namespace Messenger.Controllers.BaseControllers
 
             if (!message.IsDeleted)
                 return BadRequest("Message is not deleted");
+
+            if (message.UserId != currentUserId && currentUser.Role != UserRole.Admin && currentUser.Role != UserRole.SuperAdmin)
+                return Forbid("You can only restore your own messages");
 
             message.IsDeleted = false;
             message.MessageLastUpdateDate = DateTime.UtcNow;
